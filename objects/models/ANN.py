@@ -1,5 +1,4 @@
 import time
-from itertools import product
 from pathlib import Path
 
 import matplotlib
@@ -18,10 +17,12 @@ from evaluation import (
 )
 from objects.data import SEED, Dataset
 
-HIDDEN_SIZES = [16, 64]
-LEARNING_RATES = [0.1, 0.5]
-EPOCHS = 500
-OUTPUT_DIR = Path("../../output")
+# Hiperparâmetros FIXOS por dataset (a chave deve ser igual ao nome passado em prepare_dataset)
+PARAMS = {
+    "Mnist": {"hidden_layer_size": 128, "learning_rate": 0.10, "epochs": 3000},
+    "Breast Cancer": {"hidden_layer_size": 8, "learning_rate": 0.05, "epochs": 500},
+}
+OUTPUT_DIR = Path("./output")
 
 
 class NeuralNetwork:
@@ -30,6 +31,7 @@ class NeuralNetwork:
         self.ln = learning_rate
         self.random_state = random_state
 
+    # ------------------------------------------------------------------ modelo
     @staticmethod
     def _relu(x):
         return np.maximum(0, x)
@@ -150,40 +152,6 @@ class NeuralNetwork:
     def predict(self, X):
         return self.classes_[np.argmax(self.predict_proba(X), axis=0)]
 
-    @classmethod
-    def select_params(
-        cls, dataset: Dataset, hidden_sizes, learning_rates, epochs, random_state
-    ):
-        summary, histories = {}, {}
-
-        for h, lr in product(hidden_sizes, learning_rates):
-            model = cls(h, lr, random_state).fit(
-                dataset.X_tr,
-                dataset.y_tr,
-                epochs=epochs,
-                X_val=dataset.X_val,
-                y_val=dataset.y_val,
-                desc=f"Validação (h={h}, lr={lr})",
-            )
-            preds = model.predict(dataset.X_val)
-            summary[(h, lr)] = s = calculate_metrics(
-                dataset.y_val, preds, dataset.classes
-            )
-            histories[(h, lr)] = model.history
-            print(
-                f"h = {h:3d} | lr = {lr:.3f} | F1 = {s['f1']:.4f} | Recall = {s['recall']:.4f} | "
-                f"Precision = {s['precision']:.4f} | Accuracy = {s['accuracy']:.4f}"
-            )
-
-        best = max(
-            summary,
-            key=lambda p: (
-                round(summary[p]["f1"], 6),
-                round(summary[p]["accuracy"], 6),
-            ),
-        )
-        return best, summary, histories
-
     @staticmethod
     def plot_learning_curve(history, path, title):
         epochs = np.arange(1, len(history["loss"]) + 1)
@@ -216,53 +184,65 @@ class NeuralNetwork:
     def run(
         cls,
         dataset: Dataset,
-        hidden_sizes=HIDDEN_SIZES,
-        learning_rates=LEARNING_RATES,
-        epochs=EPOCHS,
+        hidden_layer_size=None,
+        learning_rate=None,
+        epochs=None,
         output_dir=OUTPUT_DIR,
         random_state=SEED,
     ):
+        """Treina com hiperparâmetros fixos (PARAMS[dataset.name]), avalia no teste e gera gráficos.
+
+        Os argumentos hidden_layer_size, learning_rate e epochs, se informados,
+        sobrescrevem os valores fixos do dataset.
+        Retorna {"params", "test", "history"}.
+        """
+        params = dict(PARAMS.get(dataset.name, {}))
+        for key, value in [
+            ("hidden_layer_size", hidden_layer_size),
+            ("learning_rate", learning_rate),
+            ("epochs", epochs),
+        ]:
+            if value is not None:
+                params[key] = value
+
+        missing = {"hidden_layer_size", "learning_rate", "epochs"} - params.keys()
+        if missing:
+            raise ValueError(
+                f"Sem hiperparâmetros para o dataset '{dataset.name}' (faltam: {sorted(missing)}). "
+                f"Adicione-o em PARAMS ou passe os valores em run()."
+            )
+        h, lr, ep = (
+            params["hidden_layer_size"],
+            params["learning_rate"],
+            params["epochs"],
+        )
+
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         start = time.perf_counter()
 
         print("=" * 60)
         print(f"CLASSIFICAÇÃO REDE NEURAL - {dataset.name}")
+        print(f"Hiperparâmetros fixos: h = {h} | lr = {lr} | épocas = {ep}")
         print("=" * 60)
 
         print("\n" + "=" * 60)
-        print("ETAPA 1: SELEÇÃO DE HIPERPARÂMETROS NA VALIDAÇÃO")
-        print("Critério: F1 macro")
+        print("ETAPA 1: TREINAMENTO (treino + validação)")
         print("=" * 60)
 
         t = time.perf_counter()
-        (best_h, best_lr), summary, histories = cls.select_params(
-            dataset, hidden_sizes, learning_rates, epochs, random_state
+        model = cls(h, lr, random_state).fit(
+            dataset.X_dev, dataset.y_dev, epochs=ep, desc="Treino"
         )
-        print(
-            f"\nMelhor: h = {best_h}, lr = {best_lr}  "
-            f"(etapa: {format_time(time.perf_counter() - t)})"
-        )
+        print(f"(treino: {format_time(time.perf_counter() - t)})")
 
         curve_path = output_dir / f"{dataset.name} - curva_aprendizado_ann.png"
         cls.plot_learning_curve(
-            histories[(best_h, best_lr)],
-            curve_path,
-            title=f"Rede Neural (h={best_h}, lr={best_lr}) - treino x validação",
+            model.history, curve_path, title=f"Rede Neural (h={h}, lr={lr}) - treino"
         )
 
         print("\n" + "=" * 60)
-        print("ETAPA 2: TREINAMENTO FINAL")
-        print("=" * 60)
-
-        t = time.perf_counter()
-        model = cls(best_h, best_lr, random_state).fit(
-            dataset.X_dev, dataset.y_dev, epochs=epochs, desc="Treino final"
-        )
-        print(f"(treino final: {format_time(time.perf_counter() - t)})")
-
-        print("\n" + "=" * 60)
-        print("ETAPA 3: AVALIAÇÃO FINAL NO TESTE")
+        print("ETAPA 2: AVALIAÇÃO FINAL NO TESTE")
         print("=" * 60)
 
         preds = model.predict(dataset.X_test)
@@ -271,7 +251,7 @@ class NeuralNetwork:
         print_results(
             results,
             dataset.classes,
-            extra={"Camada oculta": best_h, "Learning rate": best_lr, "Épocas": epochs},
+            extra={"Camada oculta": h, "Learning rate": lr, "Épocas": ep},
         )
 
         cm_path = output_dir / f"{dataset.name} - matriz_confusao_ann.png"
@@ -279,8 +259,8 @@ class NeuralNetwork:
             results,
             dataset.classes,
             cm_path,
-            title=f"Rede Neural\nh = {best_h} | lr = {best_lr}",
-            info=f"h = {best_h} | lr = {best_lr} | épocas = {epochs}",
+            title=f"Rede Neural\nh = {h} | lr = {lr}",
+            info=f"h = {h} | lr = {lr} | épocas = {ep}",
         )
         print(f"\nMatriz de confusão salva em: {cm_path.resolve()}")
         print(f"Curva de aprendizado salva em: {curve_path.resolve()}")
@@ -289,9 +269,4 @@ class NeuralNetwork:
         print(f"Duração Total: {format_time(time.perf_counter() - start)}")
         print("=" * 60)
 
-        return {
-            "best_params": {"hidden_layer_size": best_h, "learning_rate": best_lr},
-            "val_summary": summary,
-            "test": results,
-            "history": model.history,
-        }
+        return {"params": params, "test": results, "history": model.history}

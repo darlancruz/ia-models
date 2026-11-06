@@ -53,15 +53,15 @@ projeto/
 
 ## Como funciona
 
-Os dados são preparados uma única vez por `prepare_dataset`, que devolve um objeto `Dataset` já dividido e normalizado. Cada modelo tem um método `run(dataset)` que faz o pipeline completo:
+Os dados são preparados uma única vez por `prepare_dataset`, que devolve um objeto `Dataset` já dividido e normalizado. Cada modelo tem um método `run(dataset)` que faz o pipeline completo (a rede neural é a exceção: usa hiperparâmetros fixos por dataset, definidos em `PARAMS` no `neural_network.py`, e pula a etapa 1):
 
 1. **Seleção de hiperparâmetros** na validação (critério: F1 macro, com a accuracy como desempate).
 2. **Treino final** com os melhores hiperparâmetros em treino + validação.
 3. **Avaliação no teste**, feita uma única vez.
 4. **Gráficos e tabelas** salvos em arquivos `.png`.
 
-| Modelo | Hiperparâmetros selecionados |
+| Modelo | Hiperparâmetros |
 |---|---|
 | KNN | K (ímpares de 3 a 15) e distância (euclidiana, manhattan) |
-| Rede neural | tamanho da camada oculta e learning rate |
+| Rede neural | **fixos** (sem seleção): MNIST = 128 neurônios, lr 0,10, 3000 épocas; Breast Cancer = 8 neurônios, lr 0,05, 500 épocas |
 | Naive Bayes | `var_smoothing` |
