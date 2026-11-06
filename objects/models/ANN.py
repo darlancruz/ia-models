@@ -18,10 +18,12 @@ from evaluation import (
 from objects.data import SEED, Dataset
 
 # Hiperparâmetros FIXOS por dataset (a chave deve ser igual ao nome passado em prepare_dataset)
+
 PARAMS = {
     "Mnist": {"hidden_layer_size": 128, "learning_rate": 0.10, "epochs": 3000},
     "Breast Cancer": {"hidden_layer_size": 8, "learning_rate": 0.05, "epochs": 500},
 }
+
 OUTPUT_DIR = Path("./output")
 
 
@@ -232,8 +234,14 @@ class NeuralNetwork:
 
         t = time.perf_counter()
         model = cls(h, lr, random_state).fit(
-            dataset.X_dev, dataset.y_dev, epochs=ep, desc="Treino"
+            dataset.X_tr,
+            dataset.y_tr,
+            epochs=ep,
+            X_val=dataset.X_val,
+            y_val=dataset.y_val,
+            desc="Treino",
         )
+
         print(f"(treino: {format_time(time.perf_counter() - t)})")
 
         curve_path = output_dir / f"{dataset.name} - curva_aprendizado_ann.png"
