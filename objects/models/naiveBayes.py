@@ -17,7 +17,7 @@ from evaluation import (
 from objects.data import Dataset
 
 VAR_SMOOTHINGS = [1e-9, 1e-6, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]
-OUTPUT_DIR = Path("../../output")
+OUTPUT_DIR = Path("./output")
 
 
 class NaiveBayes:

@@ -21,7 +21,7 @@ K_RANGE = range(3, 16, 2)  # K ímpares
 METRICS = ["euclidean", "manhattan"]
 TEST_BATCH_SIZE = 250
 TRAIN_CHUNK_SIZE = 5000
-OUTPUT_DIR = Path("../../output")
+OUTPUT_DIR = Path("./output")
 
 
 class KNN:
