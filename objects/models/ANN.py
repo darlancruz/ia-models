@@ -17,11 +17,10 @@ from evaluation import (
 )
 from objects.data import SEED, Dataset
 
-# Hiperparâmetros FIXOS por dataset (a chave deve ser igual ao nome passado em prepare_dataset)
-
+# Hiperparâmetros FIXOS por dataset
 PARAMS = {
-    "Mnist": {"hidden_layer_size": 128, "learning_rate": 0.10, "epochs": 3000},
-    "Breast Cancer": {"hidden_layer_size": 8, "learning_rate": 0.05, "epochs": 500},
+    "Breast Cancer": {"hidden_layer_size": 8, "learning_rate": 0.3, "epochs": 1500},
+    "Mnist": {"hidden_layer_size": 64, "learning_rate": 0.3, "epochs": 3000},
 }
 
 OUTPUT_DIR = Path("./output")
@@ -33,7 +32,6 @@ class NeuralNetwork:
         self.ln = learning_rate
         self.random_state = random_state
 
-    # ------------------------------------------------------------------ modelo
     @staticmethod
     def _relu(x):
         return np.maximum(0, x)
